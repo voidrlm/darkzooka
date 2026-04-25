@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Darkzooka</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--surface:#161b22;--card:#1c2128;--border:#30363d;
+  --purple:#7c3aed;--purple-glow:rgba(124,58,237,.35);
+  --text:#e6edf3;--sub:#8b949e;--muted:#484f58;
+  --green:#3fb950;--red:#f85149;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;width:290px;background:var(--bg);color:var(--text);user-select:none;overflow:hidden}
+
+/* hero */
+.hero{position:relative;padding:20px 18px 16px;background:linear-gradient(150deg,#130d1f 0%,#0d1117 60%,#0a0f1a 100%);border-bottom:1px solid var(--border);overflow:hidden}
+.hero-glow{position:absolute;width:200px;height:200px;top:-70px;right:-50px;background:radial-gradient(circle,var(--purple-glow) 0%,transparent 70%);pointer-events:none}
+.hero-inner{position:relative;display:flex;align-items:center;gap:12px}
+.logo-svg{width:40px;height:40px;filter:drop-shadow(0 4px 14px var(--purple-glow));flex-shrink:0}
+.hero-text{flex:1}
+.brand{font-size:16px;font-weight:800;letter-spacing:.3px;background:linear-gradient(90deg,#c9b8ff 0%,#e6edf3 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.tagline{font-size:11px;color:var(--purple);margin-top:3px;font-weight:500}
+.status-dot{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 7px var(--green);flex-shrink:0;transition:all .3s}
+.status-dot.off{background:var(--muted);box-shadow:none}
+.pulse-ring{position:absolute;right:0;width:9px;height:9px;border-radius:50%;border:2px solid var(--green);opacity:0;animation:pulse 2.4s ease-out infinite}
+.pulse-ring.off{animation:none}
+@keyframes pulse{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.8);opacity:0}}
+
+/* rows */
+.row{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--card);border-bottom:1px solid var(--border);transition:background .15s}
+.row:hover{background:#21262d}
+.row-label{font-size:13px;font-weight:600;color:var(--text)}
+.row-sub{font-size:11px;color:var(--sub);margin-top:3px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* toggle switch */
+.switch{position:relative;display:inline-block;flex-shrink:0;cursor:pointer}
+.switch input{display:none}
+.track{display:block;width:44px;height:24px;background:var(--border);border-radius:24px;border:1.5px solid #3d444d;transition:background .28s,border-color .28s;position:relative}
+.thumb{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--muted);box-shadow:0 1px 4px rgba(0,0,0,.5);transition:transform .28s cubic-bezier(.34,1.56,.64,1),background .28s}
+.switch input:checked~.track{background:rgba(124,58,237,.2);border-color:rgba(124,58,237,.5)}
+.switch input:checked~.track .thumb{transform:translateX(20px);background:var(--purple);box-shadow:0 0 8px var(--purple-glow)}
+
+/* picker button */
+.pick-btn{display:flex;align-items:center;gap:8px;width:100%;padding:13px 18px;background:none;border:none;border-bottom:1px solid var(--border);color:var(--sub);font-size:13px;font-weight:500;cursor:pointer;transition:background .15s,color .15s;font-family:inherit;text-align:left}
+.pick-btn:hover{background:#21262d;color:var(--text)}
+.pick-btn.active{color:var(--purple);background:rgba(124,58,237,.07)}
+.pick-btn.active svg{opacity:1}
+.pick-btn svg{flex-shrink:0;opacity:.6;transition:opacity .15s}
+
+/* rules list */
+.rules-section{border-bottom:1px solid var(--border)}
+.rules-header{display:flex;align-items:center;justify-content:space-between;padding:9px 18px;background:var(--surface)}
+.rules-title{font-size:11px;font-weight:600;color:var(--sub);letter-spacing:.4px;text-transform:uppercase}
+.clear-btn{font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;font-family:inherit;transition:color .15s}
+.clear-btn:hover{color:var(--red)}
+.rules-list{max-height:130px;overflow-y:auto;background:var(--bg)}
+.rules-list::-webkit-scrollbar{width:4px}
+.rules-list::-webkit-scrollbar-track{background:transparent}
+.rules-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.rule-item{display:flex;align-items:center;gap:6px;padding:7px 18px;border-bottom:1px solid var(--border);font-size:11px;color:var(--sub);font-family:monospace}
+.rule-item:last-child{border-bottom:none}
+.rule-selector{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rule-remove{background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:1px 3px;border-radius:3px;transition:color .15s,background .15s;flex-shrink:0;line-height:1}
+.rule-remove:hover{color:var(--red);background:rgba(248,81,73,.1)}
+.rules-empty{padding:14px 18px;font-size:11.5px;color:var(--muted);text-align:center}
+
+/* backup row */
+.backup-row{display:flex;gap:8px;padding:10px 18px;border-bottom:1px solid var(--border);background:var(--surface)}
+.backup-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:7px 0;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--sub);font-size:11.5px;font-weight:500;cursor:pointer;transition:background .15s,color .15s;font-family:inherit}
+.backup-btn:hover{background:#21262d;color:var(--text)}
+
+/* footer */
+.footer-bar{padding:9px 18px;background:var(--surface);border-top:1px solid var(--border)}
+.footer-tag{font-size:10.5px;color:var(--muted);letter-spacing:.3px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="hero-glow"></div>
+  <div class="hero-inner">
+    <!-- Moon / dark-mode icon -->
+    <svg class="logo-svg" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="20" cy="20" r="17" fill="url(#dg)" stroke="url(#db)" stroke-width="1.2"/>
+      <path d="M26 20a10 10 0 1 1-10-10 7.5 7.5 0 0 0 10 10z" fill="#c9b8ff" opacity=".9"/>
+      <circle cx="27" cy="13" r="1.4" fill="#e6edf3" opacity=".7"/>
+      <circle cx="30" cy="18" r=".9" fill="#e6edf3" opacity=".5"/>
+      <circle cx="24" cy="10" r=".7" fill="#e6edf3" opacity=".5"/>
+      <defs>
+        <linearGradient id="dg" x1="20" y1="3" x2="20" y2="37" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#4c1d95"/>
+          <stop offset="100%" stop-color="#1e0a3c"/>
+        </linearGradient>
+        <linearGradient id="db" x1="20" y1="3" x2="20" y2="37" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#7c3aed"/>
+          <stop offset="100%" stop-color="#4c1d95"/>
+        </linearGradient>
+      </defs>
+    </svg>
+    <div class="hero-text">
+      <div class="brand">Darkzooka</div>
+      <div class="tagline" id="status-text">Dark mode sniper</div>
+    </div>
+    <div class="pulse-ring" id="pulse-ring"></div>
+    <div class="status-dot" id="status-dot"></div>
+  </div>
+</div>
+
+<div class="row">
+  <div>
+    <div class="row-label">Enable on this site</div>
+    <div class="row-sub" id="toggle-host">—</div>
+  </div>
+  <label class="switch">
+    <input type="checkbox" id="site-toggle" checked>
+    <span class="track"><span class="thumb"></span></span>
+  </label>
+</div>
+
+<button class="pick-btn" id="editor-btn">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+  Rule Editor
+</button>
+<button class="pick-btn" id="picker-btn">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="3"/>
+    <line x1="12" y1="2" x2="12" y2="5"/>
+    <line x1="12" y1="19" x2="12" y2="22"/>
+    <line x1="2" y1="12" x2="5" y2="12"/>
+    <line x1="19" y1="12" x2="22" y2="12"/>
+  </svg>
+  <span id="picker-label">Pick element to darken</span>
+</button>
+
+<div class="rules-section">
+  <div class="rules-header">
+    <span class="rules-title">Darkened elements</span>
+    <button class="clear-btn" id="clear-btn">Clear all</button>
+  </div>
+  <div class="rules-list" id="rules-list">
+    <div class="rules-empty" id="rules-empty">No elements picked yet</div>
+  </div>
+</div>
+
+<div class="backup-row">
+  <button class="backup-btn" id="export-btn">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Export rules
+  </button>
+  <button class="backup-btn" id="import-btn">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 5 17 10"/><line x1="12" y1="5" x2="12" y2="17"/></svg>
+    Import rules
+  </button>
+  <input type="file" id="import-file" accept=".json" style="display:none">
+</div>
+
+<div class="footer-bar">
+  <span class="footer-tag">🌙 Light elements get darkzooka'd</span>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

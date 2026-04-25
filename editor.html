@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Darkzooka — Rule Editor</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--surface:#161b22;--card:#1c2128;--border:#30363d;
+  --purple:#7c3aed;--purple-dim:rgba(124,58,237,.15);--purple-glow:rgba(124,58,237,.35);
+  --text:#e6edf3;--sub:#8b949e;--muted:#484f58;
+  --green:#3fb950;--red:#f85149;--yellow:#d29922;
+}
+html,body{height:100vh;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:13px}
+
+/* ── App shell ── */
+.app{display:flex;flex-direction:column;height:100vh}
+
+/* ── Top bar ── */
+.topbar{flex-shrink:0;display:flex;align-items:center;gap:14px;padding:11px 20px;background:var(--surface);border-bottom:1px solid var(--border)}
+.logo{display:flex;align-items:center;gap:9px;flex-shrink:0}
+.app-title{font-size:14px;font-weight:800;background:linear-gradient(90deg,#c9b8ff,#e6edf3);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;white-space:nowrap}
+.topbar-sep{width:1px;height:20px;background:var(--border);flex-shrink:0}
+
+/* ── Global search ── */
+.search-wrap{flex:1;position:relative;max-width:360px}
+.search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--muted)}
+.search-input{width:100%;background:var(--card);border:1px solid var(--border);border-radius:7px;padding:7px 10px 7px 32px;color:var(--text);font-size:12px;outline:none}
+.search-input:focus{border-color:var(--purple)}
+.search-input::placeholder{color:var(--muted)}
+.search-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;display:none;padding:2px}
+.search-clear.visible{display:block}
+
+/* ── Stats strip ── */
+.stats{display:flex;align-items:center;gap:16px;margin-left:auto;flex-shrink:0}
+.stat{font-size:11px;color:var(--sub)}
+.stat strong{color:var(--text);font-weight:600}
+.stat-sep{color:var(--border)}
+
+/* ── Content area ── */
+.content{flex:1;display:grid;grid-template-columns:260px 1fr;overflow:hidden}
+
+/* ── Panel ── */
+.panel{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden}
+.panel:last-child{border-right:none}
+
+/* ── Panel toolbar ── */
+.panel-bar{flex-shrink:0;display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--border)}
+.panel-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--sub);flex:1}
+.badge{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1px 8px;font-size:11px;color:var(--sub);flex-shrink:0}
+.badge.highlight{border-color:var(--purple);color:var(--purple)}
+
+/* ── Add row ── */
+.add-row{flex-shrink:0;display:flex;gap:6px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg)}
+.add-input{flex:1;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;outline:none;font-family:monospace}
+.add-input:focus{border-color:var(--purple)}
+.add-input::placeholder{color:var(--muted)}
+.add-btn{background:var(--purple);border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:600;padding:6px 12px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:opacity .15s}
+.add-btn:hover{opacity:.85}
+
+/* ── List ── */
+.list{flex:1;overflow-y:auto}
+.empty{padding:40px 20px;text-align:center;color:var(--muted);font-size:12px;line-height:1.8}
+.empty svg{margin-bottom:10px;opacity:.3}
+
+/* ── Site rows (left panel) ── */
+.site-row{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s}
+.site-row:hover{background:var(--card)}
+.site-row.active{background:var(--purple-dim);border-left:2px solid var(--purple)}
+.site-row.active .site-row-name{color:var(--text)}
+.site-row-name{flex:1;font-size:12px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.site-row-name mark{background:rgba(124,58,237,.25);color:var(--purple);border-radius:2px}
+.site-row-count{font-size:10px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:1px 7px;color:var(--muted);flex-shrink:0}
+.site-row.active .site-row-count{border-color:rgba(124,58,237,.4);color:var(--purple)}
+.site-row-del{background:none;border:none;color:transparent;cursor:pointer;padding:2px 4px;border-radius:3px;font-size:12px;line-height:1;flex-shrink:0;transition:color .12s}
+.site-row:hover .site-row-del{color:var(--muted)}
+.site-row-del:hover{color:var(--red) !important;background:rgba(248,81,73,.1)}
+
+/* ── Filter chips (right panel) ── */
+.chips{flex-shrink:0;display:flex;gap:6px;padding:9px 14px;border-bottom:1px solid var(--border);overflow-x:auto;background:var(--bg)}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;padding:3px 10px;border-radius:20px;border:1px solid var(--border);background:var(--card);color:var(--sub);font-size:11px;cursor:pointer;transition:all .12s;white-space:nowrap}
+.chip:hover{border-color:var(--sub);color:var(--text)}
+.chip.active{border-color:var(--purple);background:var(--purple-dim);color:var(--purple)}
+
+/* ── Site groups (right panel) ── */
+.site-label{display:flex;align-items:center;justify-content:space-between;padding:7px 14px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:2}
+.site-label-name{font-size:11px;font-weight:600;color:var(--sub);display:flex;align-items:center;gap:6px}
+.site-label-name mark{background:rgba(124,58,237,.25);color:var(--purple);border-radius:2px}
+.site-badge{font-size:10px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:0 6px;color:var(--muted);font-weight:400}
+.clear-site-btn{background:none;border:none;color:var(--muted);font-size:10px;cursor:pointer;padding:2px 6px;border-radius:3px;transition:color .12s;font-family:inherit}
+.clear-site-btn:hover{color:var(--red)}
+
+/* ── Selector rows ── */
+.sel-row{display:flex;align-items:center;gap:8px;padding:7px 14px 7px 22px;border-bottom:1px solid var(--border);transition:background .12s}
+.sel-row:hover{background:var(--card)}
+.sel-type{flex-shrink:0;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:2px 5px;border-radius:3px;opacity:.8}
+.sel-type.id  {background:rgba(210,153,34,.15); color:var(--yellow)}
+.sel-type.cls {background:rgba(63,185,80,.15);  color:var(--green)}
+.sel-type.attr{background:rgba(248,81,73,.15);  color:var(--red)}
+.sel-type.tag {background:rgba(139,148,158,.15);color:var(--sub)}
+.sel-text{flex:1;font-family:monospace;font-size:11px;color:var(--sub);word-break:break-all;min-width:0}
+.sel-text mark{background:rgba(124,58,237,.25);color:var(--purple);border-radius:2px}
+
+/* ── Delete btn ── */
+.del-btn{flex-shrink:0;background:none;border:1px solid transparent;border-radius:5px;color:var(--muted);cursor:pointer;padding:3px 6px;font-size:11px;line-height:1;transition:all .12s}
+.del-btn:hover{border-color:var(--red);color:var(--red);background:rgba(248,81,73,.08)}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="logo">
+      <svg width="24" height="24" viewBox="0 0 40 40" fill="none">
+        <circle cx="20" cy="20" r="17" fill="url(#dg)" stroke="url(#db)" stroke-width="1.2"/>
+        <path d="M26 20a10 10 0 1 1-10-10 7.5 7.5 0 0 0 10 10z" fill="#c9b8ff" opacity=".9"/>
+        <defs>
+          <linearGradient id="dg" x1="20" y1="3" x2="20" y2="37" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#4c1d95"/><stop offset="100%" stop-color="#1e0a3c"/>
+          </linearGradient>
+          <linearGradient id="db" x1="20" y1="3" x2="20" y2="37" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#4c1d95"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <span class="app-title">Rule Editor</span>
+    </div>
+    <div class="topbar-sep"></div>
+
+    <div class="search-wrap">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input class="search-input" id="search" type="text" placeholder="Search sites or selectors…" spellcheck="false" autocomplete="off">
+      <button class="search-clear" id="search-clear">✕</button>
+    </div>
+
+    <div class="stats">
+      <span class="stat"><strong id="stat-sites">0</strong> sites</span>
+      <span class="stat-sep">·</span>
+      <span class="stat"><strong id="stat-sels">0</strong> selectors</span>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ── Left: Sites ── -->
+    <div class="panel">
+      <div class="panel-bar">
+        <span class="panel-title">Sites</span>
+        <span class="badge" id="site-badge">0</span>
+      </div>
+      <div class="list" id="site-list"></div>
+    </div>
+
+    <!-- ── Right: Selectors ── -->
+    <div class="panel">
+      <div class="panel-bar">
+        <span class="panel-title" id="sel-panel-title">All Selectors</span>
+        <span class="badge" id="sel-badge">0</span>
+      </div>
+      <div class="chips" id="site-chips"></div>
+      <div class="add-row" id="add-row">
+        <input class="add-input" id="sel-input" type="text" placeholder="Add CSS selector…" spellcheck="false">
+        <button class="add-btn" id="sel-add">Add</button>
+      </div>
+      <div class="list" id="sel-list"></div>
+    </div>
+
+  </div>
+</div>
+<script src="editor.js"></script>
+</body>
+</html>
