@@ -19,9 +19,16 @@ async function loadState() {
     document.getElementById('toggle-host').textContent = currentHost || 'unknown';
 
     const data = await chrome.storage.local.get(['rules', 'settings']);
-    siteEnabled = (data.settings || {})[currentHost] !== false;
+    const settings = data.settings || {};
+    siteEnabled = settings[currentHost] !== false;
     document.getElementById('site-toggle').checked = siteEnabled;
     updateStatusUI();
+
+    const darkness = settings.__darkness ?? 100;
+    const slider = document.getElementById('darkness-slider');
+    slider.value = darkness;
+    slider.style.setProperty('--pct', darkness + '%');
+    document.getElementById('darkness-val').textContent = darkness + '%';
 
     renderRules((data.rules || {})[currentHost] || []);
 }
@@ -92,6 +99,20 @@ document.getElementById('site-toggle').addEventListener('change', async (e) => {
     await chrome.storage.local.set({ settings });
     await sendToContent({ type: 'SET_ENABLED', enabled: siteEnabled });
     updateStatusUI();
+});
+
+// darkness slider
+document.getElementById('darkness-slider').addEventListener('input', async (e) => {
+    const val = parseInt(e.target.value);
+    e.target.style.setProperty('--pct', val + '%');
+    document.getElementById('darkness-val').textContent = val + '%';
+    // Live preview on the active tab
+    sendToContent({ type: 'SET_DARKNESS', darkness: val });
+    // Persist
+    const data = await chrome.storage.local.get(['settings']);
+    const settings = data.settings || {};
+    settings.__darkness = val;
+    await chrome.storage.local.set({ settings });
 });
 
 // rule editor button

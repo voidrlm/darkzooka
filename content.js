@@ -3,36 +3,46 @@
     window.__darkzookaLoaded = true;
 
     const HOST = location.hostname;
-    let pickerActive = false;
-    let hoveredEl = null;
-    let appliedRules = [];
-    let siteEnabled = true;
+    let pickerActive   = false;
+    let hoveredEl      = null;
+    let appliedRules   = [];
+    let siteEnabled    = true;
+    let darkness       = 100;   // 10–100
 
     // ── Style tag injected synchronously — no flash ───────────────────────
     const styleEl = document.createElement('style');
     styleEl.id = '__darkzooka_styles';
     document.documentElement.appendChild(styleEl);
 
-    const DARK_VARS = `
-        --dz-bg:#0d1117;--dz-surface:#161b22;--dz-card:#1c2128;
-        --dz-border:#30363d;--dz-text:#e6edf3;--dz-subtext:#8b949e;--dz-link:#58a6ff;
-    `;
+    // CSS variables computed from darkness level (10–100).
+    // 100 = deep black (GitHub Dark), 10 = Dracula-style charcoal.
+    // Blends between two dark palettes — never goes near white.
+    function darkVars(pct) {
+        return `
+            --dz-bg:color-mix(in srgb,#0d1117 ${pct}%,#282a36);
+            --dz-surface:color-mix(in srgb,#161b22 ${pct}%,#313442);
+            --dz-card:color-mix(in srgb,#1c2128 ${pct}%,#383a4a);
+            --dz-border:color-mix(in srgb,#30363d ${pct}%,#44475a);
+            --dz-text:color-mix(in srgb,#e6edf3 ${pct}%,#f8f8f2);
+            --dz-link:color-mix(in srgb,#58a6ff ${pct}%,#8be9fd);
+        `;
+    }
 
     function buildCSS(selectors) {
         return selectors.map(s => `
-${s}{background-color:var(--dz-bg,#0d1117)!important;color:var(--dz-text,#e6edf3)!important;border-color:var(--dz-border,#30363d)!important}
-${s} *{color:var(--dz-text,#e6edf3)!important;border-color:var(--dz-border,#30363d)!important}
-${s} a,${s} a *{color:var(--dz-link,#58a6ff)!important}
-${s} input,${s} textarea,${s} select{background-color:var(--dz-surface,#161b22)!important;color:var(--dz-text,#e6edf3)!important;border-color:var(--dz-border,#30363d)!important}
-${s} button{background-color:var(--dz-card,#1c2128)!important;color:var(--dz-text,#e6edf3)!important;border-color:var(--dz-border,#30363d)!important}
-${s} [style*="background"],${s} [style*="background-color"]{background-color:var(--dz-surface,#161b22)!important}
+${s}{background-color:var(--dz-bg)!important;color:var(--dz-text)!important;border-color:var(--dz-border)!important}
+${s} *{color:var(--dz-text)!important;border-color:var(--dz-border)!important}
+${s} a,${s} a *{color:var(--dz-link)!important}
+${s} input,${s} textarea,${s} select{background-color:var(--dz-surface)!important;color:var(--dz-text)!important;border-color:var(--dz-border)!important}
+${s} button{background-color:var(--dz-card)!important;color:var(--dz-text)!important;border-color:var(--dz-border)!important}
+${s} [style*="background"],${s} [style*="background-color"]{background-color:var(--dz-surface)!important}
 ${s} img{filter:brightness(.9)!important}`).join('\n');
     }
 
     function applyRules(selectors) {
         appliedRules = selectors;
         styleEl.textContent = (siteEnabled && selectors.length)
-            ? `:root{${DARK_VARS}}\n` + buildCSS(selectors)
+            ? `:root{${darkVars(darkness)}}\n` + buildCSS(selectors)
             : '';
     }
 
@@ -41,6 +51,7 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
         chrome.storage.local.get(['rules', 'settings'], (data) => {
             const settings = data.settings || {};
             siteEnabled = settings[HOST] !== false;
+            darkness    = settings.__darkness ?? 100;
             applyRules((data.rules || {})[HOST] || []);
         });
     }
@@ -54,7 +65,9 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
             applyRules((changes.rules.newValue || {})[HOST] || []);
         }
         if (changes.settings) {
-            siteEnabled = (changes.settings.newValue || {})[HOST] !== false;
+            const s = changes.settings.newValue || {};
+            siteEnabled = s[HOST] !== false;
+            darkness    = s.__darkness ?? 100;
             applyRules(appliedRules);
         }
     });
@@ -339,6 +352,12 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
 
         if (msg.type === 'SET_ENABLED') {
             siteEnabled = msg.enabled;
+            applyRules(appliedRules);
+            sendResponse({ ok: true });
+        }
+
+        if (msg.type === 'SET_DARKNESS') {
+            darkness = msg.darkness;
             applyRules(appliedRules);
             sendResponse({ ok: true });
         }
