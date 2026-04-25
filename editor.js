@@ -296,19 +296,24 @@
             const sp   = norm.startsWith('#') ? norm.indexOf(' ') : -1;
             const anchor = sp === -1 ? (norm.startsWith('#') ? norm : '') : norm.slice(0, sp);
             const desc   = sp === -1 ? (norm.startsWith('#') ? '' : norm) : norm.slice(sp + 1);
-            let prefix = null;
+            let prefix = null, suffix = null;
             if (anchor.startsWith('#')) {
-                const m = anchor.slice(1).match(/^([\w-]*?\D)([-_]?\d+)$/);
-                if (m && m[1].length >= 2) prefix = m[1];
+                const id = anchor.slice(1);
+                const mMid = id.match(/^([\w-]*?\D[-_])(\d+)([-_]\D[\w-]*)$/);
+                if (mMid && mMid[1].length >= 2) { prefix = mMid[1]; suffix = mMid[3]; }
+                else {
+                    const mEnd = id.match(/^([\w-]*?\D)([-_]?\d+)$/);
+                    if (mEnd && mEnd[1].length >= 2) prefix = mEnd[1];
+                }
             }
-            return { orig: sel, anchor, desc, prefix };
+            return { orig: sel, anchor, desc, prefix, suffix };
         }
 
         const parsed = selectors.map(parse);
         const groups = new Map();
         for (const item of parsed) {
             if (!item.prefix) continue;
-            const key = item.prefix + '\0' + item.desc;
+            const key = item.prefix + '\0' + (item.suffix || '') + '\0' + item.desc;
             if (!groups.has(key)) groups.set(key, []);
             groups.get(key).push(item);
         }
@@ -318,8 +323,9 @@
         for (const group of groups.values()) {
             if (group.length < 2) continue;
             group.forEach(i => consumed.add(i.orig));
-            const { prefix, desc } = group[0];
-            result.push(desc ? `[id^="${prefix}"] ${desc}` : `[id^="${prefix}"]`);
+            const { prefix, suffix, desc } = group[0];
+            const merged = suffix ? `[id^="${prefix}"][id$="${suffix}"]` : `[id^="${prefix}"]`;
+            result.push(desc ? `${merged} ${desc}` : merged);
         }
         for (const item of parsed) {
             if (consumed.has(item.orig)) continue;

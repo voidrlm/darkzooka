@@ -117,24 +117,35 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
         return part;
     }
 
+    function idSel(id) {
+        const mMid = id.match(/^([\w-]*?\D[-_])(\d+)([-_]\D[\w-]*)$/);
+        if (mMid && mMid[1].length >= 2) return `[id^="${mMid[1]}"][id$="${mMid[3]}"]`;
+        const mEnd = id.match(/^([\w-]*?\D)([-_]?\d+)$/);
+        if (mEnd && mEnd[1].length >= 2) return `[id^="${mEnd[1]}"]`;
+        return '#' + CSS.escape(id);
+    }
+
     function getSelector(el) {
-        if (el.id && isStableId(el.id)) return '#' + CSS.escape(el.id);
+        if (el.id && isStableId(el.id)) {
+            return idSel(el.id);
+        }
 
         // Find the nearest stable-ID ancestor to use as an anchor.
         let anchor = null;
+        let anchorSel = '';
         for (let p = el.parentElement; p && p !== document.documentElement; p = p.parentElement) {
-            if (p.id && isStableId(p.id)) { anchor = p; break; }
+            if (p.id && isStableId(p.id)) {
+                anchor = p;
+                anchorSel = idSel(p.id);
+                break;
+            }
         }
 
         if (anchor) {
-            const anchorSel = '#' + CSS.escape(anchor.id);
-            // Build path from el up to (but not including) anchor.
-            // Skip bare nodes that have no stable classes — they add noise and length.
-            // Use descendant combinators (space) so nth-of-type is rarely needed.
             const path = [];
             for (let n = el; n && n !== anchor; n = n.parentElement) {
                 const cls = stableClasses(n);
-                if (cls || n === el) {          // always include the picked element itself
+                if (cls || n === el) {
                     path.unshift(nodeDesc(n));
                 }
             }
@@ -145,7 +156,10 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
         const parts = [];
         let node = el, depth = 0;
         while (node && node !== document.body && node.nodeType === 1 && depth < 4) {
-            if (node.id && isStableId(node.id)) { parts.unshift('#' + CSS.escape(node.id)); break; }
+            if (node.id && isStableId(node.id)) {
+                parts.unshift(idSel(node.id));
+                break;
+            }
             parts.unshift(nodeDesc(node));
             node = node.parentElement;
             depth++;
@@ -228,20 +242,24 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
             const sp    = norm.startsWith('#') ? norm.indexOf(' ') : -1;
             const anchor = sp === -1 ? (norm.startsWith('#') ? norm : '') : norm.slice(0, sp);
             const desc   = sp === -1 ? (norm.startsWith('#') ? '' : norm) : norm.slice(sp + 1);
-            let prefix = null;
+            let prefix = null, suffix = null;
             if (anchor.startsWith('#')) {
                 const id = anchor.slice(1);
-                const m  = id.match(/^([\w-]*?\D)([-_]?\d+)$/);
-                if (m && m[1].length >= 2) prefix = m[1];
+                const mMid = id.match(/^([\w-]*?\D[-_])(\d+)([-_]\D[\w-]*)$/);
+                if (mMid && mMid[1].length >= 2) { prefix = mMid[1]; suffix = mMid[3]; }
+                else {
+                    const mEnd = id.match(/^([\w-]*?\D)([-_]?\d+)$/);
+                    if (mEnd && mEnd[1].length >= 2) prefix = mEnd[1];
+                }
             }
-            return { orig: sel, anchor, desc, prefix };
+            return { orig: sel, anchor, desc, prefix, suffix };
         }
 
         const parsed = selectors.map(parse);
         const groups = new Map();
         for (const item of parsed) {
             if (!item.prefix) continue;
-            const key = item.prefix + '\0' + item.desc;
+            const key = item.prefix + '\0' + (item.suffix || '') + '\0' + item.desc;
             if (!groups.has(key)) groups.set(key, []);
             groups.get(key).push(item);
         }
@@ -252,8 +270,8 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
         for (const group of groups.values()) {
             if (group.length < 2) continue;
             group.forEach(i => consumed.add(i.orig));
-            const { prefix, desc } = group[0];
-            const merged = `[id^="${prefix}"]`;
+            const { prefix, suffix, desc } = group[0];
+            const merged = suffix ? `[id^="${prefix}"][id$="${suffix}"]` : `[id^="${prefix}"]`;
             result.push(desc ? `${merged} ${desc}` : merged);
         }
         for (const item of parsed) {
