@@ -33,12 +33,10 @@ async function loadRules() {
 
 function renderRules(rules) {
     const list = document.getElementById('rules-list');
-    const empty = document.getElementById('rules-empty');
     list.innerHTML = '';
 
     if (!rules.length) {
-        list.appendChild(empty);
-        empty.style.display = '';
+        list.innerHTML = '<div class="rules-empty">No elements picked yet</div>';
         return;
     }
 
