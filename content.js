@@ -195,6 +195,65 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
         pickerLabel.style.display = 'none';
     }
 
+    // ── Rule consolidation ────────────────────────────────────────────────
+
+    // Strips unstable classes from a stored selector string so that
+    // "#desktop-grid-1 div.a-cardui._HashAbc" normalizes to
+    // "#desktop-grid-1 div.a-cardui" before grouping.
+    function normalizeSel(sel) {
+        return sel.replace(/\.[^\s.#\[>+~]+/g, cls => isStableClass(cls.slice(1)) ? cls : '')
+                  .replace(/\s{2,}/g, ' ').trim();
+    }
+
+    // Groups selectors that share the same numbered-ID prefix and the same
+    // descendant path, then replaces them with a single [id^="prefix"] rule.
+    // e.g. ["#desktop-btf-grid-1 div.a-cardui", "#desktop-btf-grid-3 div.a-cardui"]
+    //   → ["[id^=\"desktop-btf-grid-\"] div.a-cardui"]
+    function consolidate(selectors) {
+        function parse(sel) {
+            const norm  = normalizeSel(sel);
+            const sp    = norm.startsWith('#') ? norm.indexOf(' ') : -1;
+            const anchor = sp === -1 ? (norm.startsWith('#') ? norm : '') : norm.slice(0, sp);
+            const desc   = sp === -1 ? (norm.startsWith('#') ? '' : norm) : norm.slice(sp + 1);
+            let prefix = null;
+            if (anchor.startsWith('#')) {
+                const id = anchor.slice(1);
+                const m  = id.match(/^([\w-]*?\D)([-_]?\d+)$/);
+                if (m && m[1].length >= 2) prefix = m[1];
+            }
+            return { orig: sel, anchor, desc, prefix };
+        }
+
+        const parsed = selectors.map(parse);
+        const groups = new Map();
+        for (const item of parsed) {
+            if (!item.prefix) continue;
+            const key = item.prefix + '\0' + item.desc;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(item);
+        }
+
+        const consumed = new Set();
+        const result   = [];
+
+        for (const group of groups.values()) {
+            if (group.length < 2) continue;
+            group.forEach(i => consumed.add(i.orig));
+            const { prefix, desc } = group[0];
+            const merged = `[id^="${prefix}"]`;
+            result.push(desc ? `${merged} ${desc}` : merged);
+        }
+        for (const item of parsed) {
+            if (consumed.has(item.orig)) continue;
+            // Emit normalized form so hash classes are cleaned even for non-consolidated rules
+            const clean = item.anchor
+                ? (item.anchor + (item.desc ? ' ' + item.desc : ''))
+                : normalizeSel(item.orig);
+            result.push(clean);
+        }
+        return [...new Set(result)];
+    }
+
     // ── Picker event handlers ─────────────────────────────────────────────
     function onMouseMove(e) {
         const el = e.target;
@@ -213,12 +272,13 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
 
         const sel = getSelector(el);
         chrome.storage.local.get(['rules'], (data) => {
-            const rules = data.rules || {};
+            const rules     = data.rules || {};
             const siteRules = rules[HOST] || [];
-            if (!siteRules.includes(sel)) siteRules.push(sel);
-            rules[HOST] = siteRules;
+            siteRules.push(sel);
+            const consolidated = consolidate(siteRules);
+            rules[HOST] = consolidated;
             chrome.storage.local.set({ rules }, () => {
-                applyRules(siteRules);
+                applyRules(consolidated);
                 chrome.runtime.sendMessage({ type: 'RULES_UPDATED' }).catch(() => {});
             });
         });

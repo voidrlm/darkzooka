@@ -272,6 +272,82 @@
         await save(); render();
     });
 
+    // ── Consolidation ─────────────────────────────────────────────────────────
+
+    function isStableClass(cls) {
+        if (!cls || cls.length < 2) return false;
+        if (/^_[A-Z0-9]/.test(cls)) return false;
+        if (/^_\d/.test(cls)) return false;
+        if (cls.length <= 6 && /\d/.test(cls) && /[a-zA-Z]/.test(cls)) return false;
+        if (/[_-][A-Z][a-z0-9]{1,4}$/.test(cls)) return false;
+        if (/[_-][a-z0-9]{1,3}[A-Z][a-z]{0,2}$/.test(cls)) return false;
+        if (/[a-z]\d[A-Z]|[A-Z]\d[a-z]/.test(cls)) return false;
+        return true;
+    }
+
+    function normalizeSel(sel) {
+        return sel.replace(/\.[^\s.#\[>+~]+/g, cls => isStableClass(cls.slice(1)) ? cls : '')
+                  .replace(/\s{2,}/g, ' ').trim();
+    }
+
+    function consolidateSite(selectors) {
+        function parse(sel) {
+            const norm = normalizeSel(sel);
+            const sp   = norm.startsWith('#') ? norm.indexOf(' ') : -1;
+            const anchor = sp === -1 ? (norm.startsWith('#') ? norm : '') : norm.slice(0, sp);
+            const desc   = sp === -1 ? (norm.startsWith('#') ? '' : norm) : norm.slice(sp + 1);
+            let prefix = null;
+            if (anchor.startsWith('#')) {
+                const m = anchor.slice(1).match(/^([\w-]*?\D)([-_]?\d+)$/);
+                if (m && m[1].length >= 2) prefix = m[1];
+            }
+            return { orig: sel, anchor, desc, prefix };
+        }
+
+        const parsed = selectors.map(parse);
+        const groups = new Map();
+        for (const item of parsed) {
+            if (!item.prefix) continue;
+            const key = item.prefix + '\0' + item.desc;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(item);
+        }
+
+        const consumed = new Set();
+        const result   = [];
+        for (const group of groups.values()) {
+            if (group.length < 2) continue;
+            group.forEach(i => consumed.add(i.orig));
+            const { prefix, desc } = group[0];
+            result.push(desc ? `[id^="${prefix}"] ${desc}` : `[id^="${prefix}"]`);
+        }
+        for (const item of parsed) {
+            if (consumed.has(item.orig)) continue;
+            const clean = item.anchor
+                ? (item.anchor + (item.desc ? ' ' + item.desc : ''))
+                : normalizeSel(item.orig);
+            result.push(clean);
+        }
+        return [...new Set(result)];
+    }
+
+    document.getElementById('consolidate-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('consolidate-btn');
+        let totalBefore = 0, totalAfter = 0;
+        for (const site of Object.keys(rules)) {
+            const before = rules[site].length;
+            rules[site] = consolidateSite(rules[site]);
+            totalBefore += before;
+            totalAfter  += rules[site].length;
+        }
+        await save();
+        render();
+        const saved = totalBefore - totalAfter;
+        const orig  = btn.innerHTML;
+        btn.textContent = saved > 0 ? `Saved ${saved} rule${saved !== 1 ? 's' : ''}` : 'Already clean';
+        setTimeout(() => { btn.innerHTML = orig; }, 2000);
+    });
+
     // ── Live storage updates ──────────────────────────────────────────────────
     chrome.storage.onChanged.addListener(changes => {
         if (changes.rules) { rules = changes.rules.newValue || {}; render(); }
