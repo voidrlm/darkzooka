@@ -222,6 +222,24 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
         pickerLabel.style.display = 'none';
     }
 
+    // ── Picker dark preview ───────────────────────────────────────────────
+    let previewStyleEl = null;
+
+    function applyPreview(el) {
+        if (!el) { clearPreview(); return; }
+        if (!previewStyleEl) {
+            previewStyleEl = document.createElement('style');
+            previewStyleEl.id = '__darkzooka_preview';
+            document.documentElement.appendChild(previewStyleEl);
+        }
+        const sel = getSelector(el);
+        previewStyleEl.textContent = `:root{${darkVars(darkness)}}\n` + buildCSS([sel]);
+    }
+
+    function clearPreview() {
+        if (previewStyleEl) previewStyleEl.textContent = '';
+    }
+
     // ── Rule consolidation ────────────────────────────────────────────────
 
     // Strips unstable classes from a stored selector string so that
@@ -290,8 +308,9 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
         const el = e.target;
         if (el === highlight || el === pickerLabel || el.id?.startsWith('__darkzooka')) return;
         hoveredEl = el;
-        pickerTarget = el;      // reset target to actual hovered element on every move
+        pickerTarget = el;
         moveHighlight(pickerTarget);
+        applyPreview(pickerTarget);
     }
 
     function onClick(e) {
@@ -327,6 +346,7 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
             if (parent && parent !== document.documentElement) {
                 pickerTarget = parent;
                 moveHighlight(pickerTarget);
+                applyPreview(pickerTarget);
             }
             return;
         }
@@ -334,11 +354,10 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
         // ] — move selection back DOWN toward originally hovered element
         if (e.key === ']') {
             e.preventDefault();
-            // Walk back down: find hoveredEl's ancestor that is a direct child of pickerTarget
             if (pickerTarget && hoveredEl && pickerTarget !== hoveredEl) {
                 let n = hoveredEl;
                 while (n && n.parentElement !== pickerTarget) n = n.parentElement;
-                if (n) { pickerTarget = n; moveHighlight(pickerTarget); }
+                if (n) { pickerTarget = n; moveHighlight(pickerTarget); applyPreview(pickerTarget); }
             }
         }
     }
@@ -360,6 +379,7 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
         document.removeEventListener('keydown', onKeyDown, true);
         document.body.style.cursor = '';
         hideHighlight();
+        clearPreview();
         chrome.runtime.sendMessage({ type: 'PICKER_STOPPED' }).catch(() => {});
     }
 
