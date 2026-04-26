@@ -117,11 +117,53 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
         return part;
     }
 
-    function idSel(id) {
+    function decodeCssEscapes(str) {
+        return str.replace(/\\([0-9a-fA-F]{1,6}\s?|.)/g, (_m, esc) => {
+            if (/^[0-9a-fA-F]/.test(esc)) {
+                const hex = esc.trim();
+                const cp = parseInt(hex, 16);
+                return Number.isNaN(cp) ? '' : String.fromCodePoint(cp);
+            }
+            return esc;
+        });
+    }
+
+    function compressNumericPrefix(id) {
+        if (!/^\d+$/.test(id)) return id;
+        // Ultra-broad mode: one numeric bucket covers all related IDs.
+        if (id.length >= 3) return id.slice(0, 1);
+        return id;
+    }
+
+    function extractIdPattern(rawId) {
+        const id = decodeCssEscapes(rawId);
+        const mHexTail = id.match(/^(.+[-_])[0-9a-f]{6,}$/i);
+        if (mHexTail && mHexTail[1].length >= 2) return { prefix: mHexTail[1], suffix: null };
+
+        const mGenericMid = id.match(/^(.+?)(\d+)([^\d].+)$/);
+        if (mGenericMid && mGenericMid[1].length >= 2 && mGenericMid[3].length >= 2) {
+            return { prefix: mGenericMid[1], suffix: mGenericMid[3] };
+        }
+
         const mMid = id.match(/^([\w-]*?\D[-_])(\d+)([-_]\D[\w-]*)$/);
-        if (mMid && mMid[1].length >= 2) return `[id^="${mMid[1]}"][id$="${mMid[3]}"]`;
-        const mEnd = id.match(/^([\w-]*?\D)([-_]?\d+)$/);
-        if (mEnd && mEnd[1].length >= 2) return `[id^="${mEnd[1]}"]`;
+        if (mMid && mMid[1].length >= 2) return { prefix: mMid[1], suffix: mMid[3] };
+
+        const mEnd = id.match(/^(.+?)([-_]?\d+)$/);
+        if (mEnd && mEnd[1].length >= 2) return { prefix: mEnd[1], suffix: null };
+
+        // Numeric-only IDs like "171555" are often sequential.
+        if (/^\d{4,}$/.test(id)) return { prefix: compressNumericPrefix(id), suffix: null };
+
+        return null;
+    }
+
+    function idSel(id) {
+        const pattern = extractIdPattern(id);
+        if (pattern) {
+            return pattern.suffix
+                ? `[id^="${pattern.prefix}"][id$="${pattern.suffix}"]`
+                : `[id^="${pattern.prefix}"]`;
+        }
         return '#' + CSS.escape(id);
     }
 
@@ -142,6 +184,13 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
         }
 
         if (anchor) {
+            // Prefer compact selector: anchor + the picked node itself
+            // when the node has stable classes (far less brittle than full path).
+            const targetWithClasses = nodeDesc(el, false);
+            if (targetWithClasses.includes('.')) {
+                return anchorSel + ' ' + targetWithClasses;
+            }
+
             const path = [];
             for (let n = el; n && n !== anchor; n = n.parentElement) {
                 const cls = stableClasses(n);
@@ -149,7 +198,9 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
                     path.unshift(nodeDesc(n));
                 }
             }
-            return anchorSel + ' ' + path.join(' ');
+            // Keep only the most relevant tail to avoid over-specific selectors.
+            const compactPath = path.slice(-2);
+            return anchorSel + ' ' + compactPath.join(' ');
         }
 
         // No stable-ID ancestor — build a short class-based path (max 4 levels).
@@ -164,7 +215,7 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
             node = node.parentElement;
             depth++;
         }
-        return parts.join(' ');
+        return parts.slice(-2).join(' ');
     }
 
     // ── Picker overlay — created lazily on first use ───────────────────────
@@ -262,12 +313,16 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
             const desc   = sp === -1 ? (norm.startsWith('#') ? '' : norm) : norm.slice(sp + 1);
             let prefix = null, suffix = null;
             if (anchor.startsWith('#')) {
-                const id = anchor.slice(1);
-                const mMid = id.match(/^([\w-]*?\D[-_])(\d+)([-_]\D[\w-]*)$/);
-                if (mMid && mMid[1].length >= 2) { prefix = mMid[1]; suffix = mMid[3]; }
-                else {
-                    const mEnd = id.match(/^([\w-]*?\D)([-_]?\d+)$/);
-                    if (mEnd && mEnd[1].length >= 2) prefix = mEnd[1];
+                const pattern = extractIdPattern(anchor.slice(1));
+                if (pattern) {
+                    prefix = pattern.prefix;
+                    suffix = pattern.suffix;
+                }
+            } else if (anchor.startsWith('[id^="')) {
+                const m = anchor.match(/^\[id\^="([^"]+)"\](?:\[id\$="([^"]+)"\])?$/);
+                if (m) {
+                    prefix = compressNumericPrefix(decodeCssEscapes(m[1]));
+                    suffix = m[2] ? decodeCssEscapes(m[2]) : null;
                 }
             }
             return { orig: sel, anchor, desc, prefix, suffix };
