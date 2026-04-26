@@ -275,6 +275,7 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
 
     // ── Picker dark preview ───────────────────────────────────────────────
     let previewStyleEl = null;
+    let pickerCursorStyleEl = null;
 
     function applyPreview(el) {
         if (!el) { clearPreview(); return; }
@@ -289,6 +290,17 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
 
     function clearPreview() {
         if (previewStyleEl) previewStyleEl.textContent = '';
+    }
+
+    function setPickerCursor(active) {
+        if (!pickerCursorStyleEl) {
+            pickerCursorStyleEl = document.createElement('style');
+            pickerCursorStyleEl.id = '__darkzooka_picker_cursor';
+            document.documentElement.appendChild(pickerCursorStyleEl);
+        }
+        pickerCursorStyleEl.textContent = active
+            ? `html, html * { cursor: crosshair !important; }`
+            : '';
     }
 
     // ── Rule consolidation ────────────────────────────────────────────────
@@ -368,11 +380,15 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
         applyPreview(pickerTarget);
     }
 
-    function onClick(e) {
+    function onPointerDown(e) {
         if (!pickerActive) return;
         e.preventDefault();
         e.stopPropagation();
-        const el = pickerTarget || hoveredEl;
+
+        const pointTarget = document.elementFromPoint(e.clientX, e.clientY);
+        const el = (pointTarget && !pointTarget.id?.startsWith('__darkzooka'))
+            ? pointTarget
+            : (pickerTarget || hoveredEl);
         if (!el || el.id?.startsWith('__darkzooka')) return;
 
         const sel = getSelector(el);
@@ -387,6 +403,12 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
                 chrome.runtime.sendMessage({ type: 'RULES_UPDATED' }).catch(() => {});
             });
         });
+    }
+
+    function onClick(e) {
+        if (!pickerActive) return;
+        e.preventDefault();
+        e.stopPropagation();
     }
 
     function onKeyDown(e) {
@@ -422,17 +444,19 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
         pickerActive  = true;
         pickerTarget  = null;
         document.addEventListener('mousemove', onMouseMove, true);
+        document.addEventListener('pointerdown', onPointerDown, true);
         document.addEventListener('click', onClick, true);
         document.addEventListener('keydown', onKeyDown, true);
-        document.body.style.cursor = 'crosshair';
+        setPickerCursor(true);
     }
 
     function stopPicker() {
         pickerActive = false;
         document.removeEventListener('mousemove', onMouseMove, true);
+        document.removeEventListener('pointerdown', onPointerDown, true);
         document.removeEventListener('click', onClick, true);
         document.removeEventListener('keydown', onKeyDown, true);
-        document.body.style.cursor = '';
+        setPickerCursor(false);
         hideHighlight();
         clearPreview();
         chrome.runtime.sendMessage({ type: 'PICKER_STOPPED' }).catch(() => {});
