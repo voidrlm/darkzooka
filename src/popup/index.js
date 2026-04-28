@@ -2,7 +2,7 @@ let currentTab  = null;
 let currentHost = '';
 let pickerActive       = false;
 let simplePickerActive = false;
-let revertActive       = false;
+let exceptionActive    = false;
 let siteEnabled        = true;
 
 async function getActiveTab() {
@@ -20,7 +20,7 @@ async function loadState() {
 
     document.getElementById('toggle-host').textContent = currentHost || 'unknown';
 
-    const data     = await chrome.storage.local.get(['rules', 'settings']);
+    const data     = await chrome.storage.local.get(['rules', 'exceptions', 'settings']);
     const settings = data.settings || {};
     siteEnabled = settings[currentHost] !== false;
     document.getElementById('site-toggle').checked = siteEnabled;
@@ -33,11 +33,13 @@ async function loadState() {
     document.getElementById('darkness-val').textContent = darkness + '%';
 
     renderRules((data.rules || {})[currentHost] || []);
+    renderExceptions((data.exceptions || {})[currentHost] || []);
 }
 
 async function loadRules() {
-    const data = await chrome.storage.local.get(['rules']);
+    const data = await chrome.storage.local.get(['rules', 'exceptions']);
     renderRules((data.rules || {})[currentHost] || []);
+    renderExceptions((data.exceptions || {})[currentHost] || []);
 }
 
 function renderRules(rules) {
@@ -59,9 +61,39 @@ function renderRules(rules) {
         const remove = document.createElement('button');
         remove.className = 'rule-remove';
         remove.title = 'Remove';
-        remove.textContent = '×';
+        remove.textContent = 'x';
         remove.addEventListener('click', async () => {
             await sendToContent({ type: 'REMOVE_RULE', selector: sel });
+            await loadRules();
+        });
+        item.appendChild(label);
+        item.appendChild(remove);
+        list.appendChild(item);
+    });
+}
+
+function renderExceptions(exceptions) {
+    const list = document.getElementById('exceptions-list');
+    list.innerHTML = '';
+
+    if (!exceptions.length) {
+        list.innerHTML = '<div class="rules-empty">No exceptions picked yet</div>';
+        return;
+    }
+
+    exceptions.forEach(sel => {
+        const item   = document.createElement('div');
+        item.className = 'rule-item';
+        const label  = document.createElement('span');
+        label.className = 'rule-selector';
+        label.title = sel;
+        label.textContent = sel;
+        const remove = document.createElement('button');
+        remove.className = 'rule-remove';
+        remove.title = 'Remove';
+        remove.textContent = 'x';
+        remove.addEventListener('click', async () => {
+            await sendToContent({ type: 'REMOVE_EXCEPTION', selector: sel });
             await loadRules();
         });
         item.appendChild(label);
@@ -161,32 +193,38 @@ document.getElementById('simple-picker-btn').addEventListener('click', async () 
     window.close();
 });
 
-// revert picker button
-document.getElementById('revert-btn').addEventListener('click', async () => {
-    if (revertActive) {
-        revertActive = false;
-        document.getElementById('revert-btn').classList.remove('active');
-        document.getElementById('revert-label').textContent = 'Revert element to original';
-        await sendToContent({ type: 'STOP_REVERT_PICKER' });
+// exception picker button
+document.getElementById('exception-btn').addEventListener('click', async () => {
+    if (exceptionActive) {
+        exceptionActive = false;
+        document.getElementById('exception-btn').classList.remove('active');
+        document.getElementById('exception-label').textContent = 'Exception pick';
+        await sendToContent({ type: 'STOP_EXCEPTION_PICKER' });
     } else {
-        revertActive = true;
-        document.getElementById('revert-btn').classList.add('active');
-        document.getElementById('revert-label').textContent = 'Click element to revert… (Esc to cancel)';
-        await sendToContent({ type: 'START_REVERT_PICKER' });
+        exceptionActive = true;
+        document.getElementById('exception-btn').classList.add('active');
+        document.getElementById('exception-label').textContent = 'Click element to exclude... (Esc to cancel)';
+        await sendToContent({ type: 'START_EXCEPTION_PICKER' });
     }
     window.close();
 });
 
-// clear all
-document.getElementById('clear-btn').addEventListener('click', async () => {
+// clear darkened elements
+document.getElementById('clear-rules-btn').addEventListener('click', async () => {
     await sendToContent({ type: 'CLEAR_RULES' });
+    await loadRules();
+});
+
+// clear exceptions
+document.getElementById('clear-exceptions-btn').addEventListener('click', async () => {
+    await sendToContent({ type: 'CLEAR_EXCEPTIONS' });
     await loadRules();
 });
 
 // export
 document.getElementById('export-btn').addEventListener('click', async () => {
-    const data    = await chrome.storage.local.get(['rules']);
-    const payload = JSON.stringify({ version: 1, rules: data.rules || {} }, null, 2);
+    const data    = await chrome.storage.local.get(['rules', 'exceptions']);
+    const payload = JSON.stringify({ version: 1, rules: data.rules || {}, exceptions: data.exceptions || {} }, null, 2);
     const url     = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
     const a = Object.assign(document.createElement('a'), {
         href: url,
@@ -221,6 +259,9 @@ $importFile.addEventListener('change', async () => {
     const incoming = parsed.rules && typeof parsed.rules === 'object'
         ? parsed.rules
         : (typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null);
+    const incomingExceptions = parsed.exceptions && typeof parsed.exceptions === 'object'
+        ? parsed.exceptions
+        : {};
 
     if (!incoming) {
         const orig = btn.innerHTML;
@@ -230,13 +271,18 @@ $importFile.addEventListener('change', async () => {
         return;
     }
 
-    const data     = await chrome.storage.local.get(['rules']);
+    const data     = await chrome.storage.local.get(['rules', 'exceptions']);
     const existing = data.rules || {};
+    const existingExceptions = data.exceptions || {};
     for (const [host, sels] of Object.entries(incoming)) {
         if (!Array.isArray(sels)) continue;
         existing[host] = [...new Set([...(existing[host] || []), ...sels])];
     }
-    await chrome.storage.local.set({ rules: existing });
+    for (const [host, sels] of Object.entries(incomingExceptions)) {
+        if (!Array.isArray(sels)) continue;
+        existingExceptions[host] = [...new Set([...(existingExceptions[host] || []), ...sels])];
+    }
+    await chrome.storage.local.set({ rules: existing, exceptions: existingExceptions });
 
     const totalNew = Object.values(incoming).reduce((n, a) => n + (Array.isArray(a) ? a.length : 0), 0);
     const orig = btn.innerHTML;
@@ -248,18 +294,18 @@ $importFile.addEventListener('change', async () => {
 
 // listen for updates from content script
 chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.type === 'RULES_UPDATED' || msg.type === 'PICKER_STOPPED' ||
-        msg.type === 'SIMPLE_PICKER_STOPPED' || msg.type === 'REVERT_PICKER_STOPPED') {
+    if (msg.type === 'RULES_UPDATED' || msg.type === 'EXCEPTIONS_UPDATED' || msg.type === 'PICKER_STOPPED' ||
+        msg.type === 'SIMPLE_PICKER_STOPPED' || msg.type === 'EXCEPTION_PICKER_STOPPED') {
         loadRules();
         pickerActive       = false;
         simplePickerActive = false;
-        revertActive       = false;
+        exceptionActive    = false;
         document.getElementById('picker-btn').classList.remove('active');
         document.getElementById('picker-label').textContent = 'Smart pick';
         document.getElementById('simple-picker-btn').classList.remove('active');
         document.getElementById('simple-picker-label').textContent = 'Simple pick';
-        document.getElementById('revert-btn').classList.remove('active');
-        document.getElementById('revert-label').textContent = 'Revert element to original';
+        document.getElementById('exception-btn').classList.remove('active');
+        document.getElementById('exception-label').textContent = 'Exception pick';
     }
 });
 

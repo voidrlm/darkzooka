@@ -56,8 +56,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;w
 .pick-btn.active{color:var(--purple);background:rgba(124,58,237,.07)}
 .pick-btn.active svg{opacity:1}
 .pick-btn svg{flex-shrink:0;opacity:.6;transition:opacity .15s}
-#revert-btn.active{color:var(--red);background:rgba(248,81,73,.07)}
-#revert-btn.active svg{opacity:1}
+#exception-btn.active{color:var(--green);background:rgba(63,185,80,.07)}
+#exception-btn.active svg{opacity:1}
 
 /* rules list */
 .rules-section{border-bottom:1px solid var(--border)}
@@ -160,20 +160,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;w
   </svg>
   <span id="simple-picker-label">Simple pick</span>
 </button>
-<button class="pick-btn" id="revert-btn">
+<button class="pick-btn" id="exception-btn">
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M3 7v6h6"/>
-    <path d="M3 13C5 8 9.5 5 15 5a9 9 0 0 1 9 9 9 9 0 0 1-9 9c-4 0-7.4-2-9-5"/>
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    <path d="M9 12l2 2 4-5"/>
   </svg>
-  <span id="revert-label">Revert element to original</span>
+  <span id="exception-label">Exception pick</span>
 </button>
 
 <div class="rules-section">
   <div class="rules-header">
     <span class="rules-title">Darkened elements</span>
-    <button class="clear-btn" id="clear-btn">Clear all</button>
+    <button class="clear-btn" id="clear-rules-btn">Clear all</button>
   </div>
   <div class="rules-list" id="rules-list"></div>
+</div>
+<div class="rules-section">
+  <div class="rules-header">
+    <span class="rules-title">Exceptions</span>
+    <button class="clear-btn" id="clear-exceptions-btn">Clear all</button>
+  </div>
+  <div class="rules-list" id="exceptions-list"></div>
 </div>
 
 <div class="backup-row">

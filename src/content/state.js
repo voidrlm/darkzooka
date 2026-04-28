@@ -3,6 +3,7 @@ export const HOST = location.hostname;
 export const state = {
     // CSS application
     appliedRules:       [],
+    exceptions:         [],
     siteEnabled:        true,
     darkness:           100,
     styleEl:            null,
@@ -17,7 +18,6 @@ export const state = {
     // Simple picker
     simplePickerActive:  false,
 
-    // Revert picker
-    revertPickerActive:  false,
-    revertPreviewActive: false,
+    // Exception picker
+    exceptionPickerActive: false,
 };

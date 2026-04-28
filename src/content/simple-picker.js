@@ -23,7 +23,7 @@ function applyPreview(el) {
     }
     document.documentElement.appendChild(previewStyleEl);
     const sel = getSimpleSelector(el);
-    previewStyleEl.textContent = `:root{${darkVars(state.darkness)}}\n` + buildCSS([sel]);
+    previewStyleEl.textContent = `:root{${darkVars(state.darkness)}}\n` + buildCSS([sel], state.exceptions);
 }
 
 function clearPreview() {

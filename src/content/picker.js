@@ -18,7 +18,7 @@ export function applyPreview(el) {
     }
     document.documentElement.appendChild(previewStyleEl);
     const sel = getSelector(el);
-    previewStyleEl.textContent = `:root{${darkVars(state.darkness)}}\n` + buildCSS([sel]);
+    previewStyleEl.textContent = `:root{${darkVars(state.darkness)}}\n` + buildCSS([sel], state.exceptions);
 }
 
 export function clearPreview() {
@@ -51,7 +51,7 @@ function onPointerDown(e) {
         state.siteEnabled = true;
         rules[HOST] = siteRules;
         chrome.storage.local.set({ rules, settings }, () => {
-            applyRules(siteRules);
+            applyRules(siteRules, state.exceptions);
             stopPicker();
             chrome.runtime.sendMessage({ type: 'RULES_UPDATED' }).catch(() => {});
         });
