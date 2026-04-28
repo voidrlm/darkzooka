@@ -13,9 +13,11 @@ export function buildCSS(selectors) {
     return selectors.map(s => `
 ${s}{background-color:var(--dz-bg)!important;color:var(--dz-text)!important;border-color:var(--dz-border)!important}
 ${s} *{color:var(--dz-text)!important;border-color:var(--dz-border)!important}
+${s} :where(div,span,section,article,aside,nav,header,footer,main,ul,ol,li,p,h1,h2,h3,h4,h5,h6){background-color:transparent!important}
+${s} :where([class*="bg-"],[class*="background"],[class*="white"],[class*="surface"],[class*="card"],[role="main"],[role="region"],[role="dialog"],[role="listitem"],section,article,aside,nav,header,footer){background-color:var(--dz-surface)!important}
 ${s} a,${s} a *{color:var(--dz-link)!important}
 ${s} input,${s} textarea,${s} select{background-color:var(--dz-surface)!important;color:var(--dz-text)!important;border-color:var(--dz-border)!important}
 ${s} button{background-color:var(--dz-card)!important;color:var(--dz-text)!important;border-color:var(--dz-border)!important}
-${s} [style*="background"],${s} [style*="background-color"]{background-color:var(--dz-surface)!important}
+${s} [style*="background" i],${s} [style*="background-color" i]{background-color:var(--dz-surface)!important}
 ${s} img{filter:brightness(.9)!important}`).join('\n');
 }

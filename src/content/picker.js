@@ -2,7 +2,6 @@ import { HOST, state } from './state.js';
 import { applyRules } from './storage.js';
 import { getSelector } from '../shared/selectors.js';
 import { darkVars, buildCSS } from '../shared/css.js';
-import { consolidate } from '../shared/consolidate.js';
 import {
     ensureOverlayDOM, moveHighlight, hideOverlay,
     resetOverlayColor, setPickerCursor,
@@ -17,6 +16,7 @@ export function applyPreview(el) {
         previewStyleEl.id = '__darkzooka_preview';
         document.documentElement.appendChild(previewStyleEl);
     }
+    document.documentElement.appendChild(previewStyleEl);
     const sel = getSelector(el);
     previewStyleEl.textContent = `:root{${darkVars(state.darkness)}}\n` + buildCSS([sel]);
 }
@@ -43,14 +43,16 @@ function onPointerDown(e) {
     if (!el || el.id?.startsWith('__darkzooka')) return;
 
     const sel = getSelector(el);
-    chrome.storage.local.get(['rules'], (data) => {
+    chrome.storage.local.get(['rules', 'settings'], (data) => {
         const rules     = data.rules || {};
-        const siteRules = rules[HOST] || [];
-        siteRules.push(sel);
-        const merged = consolidate(siteRules);
-        rules[HOST]  = merged;
-        chrome.storage.local.set({ rules }, () => {
-            applyRules(merged);
+        const settings  = data.settings || {};
+        const siteRules = [...new Set([...(rules[HOST] || []), sel])];
+        settings[HOST] = true;
+        state.siteEnabled = true;
+        rules[HOST] = siteRules;
+        chrome.storage.local.set({ rules, settings }, () => {
+            applyRules(siteRules);
+            stopPicker();
             chrome.runtime.sendMessage({ type: 'RULES_UPDATED' }).catch(() => {});
         });
     });

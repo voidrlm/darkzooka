@@ -10,9 +10,19 @@ function isStorageAvailable() {
 
 export function applyRules(selectors) {
     state.appliedRules = selectors;
+    if (state.styleEl?.parentNode) {
+        document.documentElement.appendChild(state.styleEl);
+    }
     state.styleEl.textContent = (state.siteEnabled && selectors.length)
         ? `:root{${darkVars(state.darkness)}}\n` + buildCSS(selectors)
         : '';
+    window.__darkzookaDebug = {
+        host: HOST,
+        enabled: state.siteEnabled,
+        darkness: state.darkness,
+        rules: state.appliedRules,
+        cssLength: state.styleEl?.textContent.length || 0,
+    };
 }
 
 export function loadAndApply() {

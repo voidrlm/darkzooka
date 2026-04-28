@@ -9,6 +9,9 @@ export function init(styleEl) {
     loadAndApply();
     initStorageListener();
     initMessageBus();
+
+    window.addEventListener('load', () => applyRules(state.appliedRules), { once: true });
+    setTimeout(() => applyRules(state.appliedRules), 1500);
 }
 
 function initMessageBus() {

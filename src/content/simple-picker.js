@@ -21,6 +21,7 @@ function applyPreview(el) {
         previewStyleEl.id = '__darkzooka_simple_preview';
         document.documentElement.appendChild(previewStyleEl);
     }
+    document.documentElement.appendChild(previewStyleEl);
     const sel = getSimpleSelector(el);
     previewStyleEl.textContent = `:root{${darkVars(state.darkness)}}\n` + buildCSS([sel]);
 }

@@ -88,6 +88,16 @@ function updateStatusUI() {
 async function sendToContent(msg) {
     if (!currentTab?.id) return;
     try { return await chrome.tabs.sendMessage(currentTab.id, msg); } catch {}
+
+    try {
+        await chrome.scripting.executeScript({
+            target: { tabId: currentTab.id },
+            files: ['content.js'],
+        });
+        return await chrome.tabs.sendMessage(currentTab.id, msg);
+    } catch {
+        return { ok: false };
+    }
 }
 
 // site toggle
