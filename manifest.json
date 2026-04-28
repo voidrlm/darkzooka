@@ -29,10 +29,15 @@
     "host_permissions": ["<all_urls>"],
     "content_scripts": [
         {
-            "js": ["src/content/index.js"],
+            "js": ["content.js"],
             "matches": ["http://*/*", "https://*/*"],
-            "run_at": "document_start",
-            "type": "module"
+            "run_at": "document_start"
+        }
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": ["src/content/*", "src/shared/*"],
+            "matches": ["<all_urls>"]
         }
     ]
 }
