@@ -3,16 +3,8 @@ import { applyRules, loadAndApply, initStorageListener } from './storage.js';
 import { startPicker, stopPicker } from './picker.js';
 import { startRevertPicker, stopRevertPicker } from './revert.js';
 
-if (!window.__darkzookaLoaded) {
-    window.__darkzookaLoaded = true;
-    init();
-}
-
-function init() {
-    state.styleEl = document.createElement('style');
-    state.styleEl.id = '__darkzooka_styles';
-    document.documentElement.appendChild(state.styleEl);
-
+export function init(styleEl) {
+    state.styleEl = styleEl;
     loadAndApply();
     initStorageListener();
     initMessageBus();
