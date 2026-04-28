@@ -1,6 +1,7 @@
 import { HOST, state } from './state.js';
 import { applyRules, loadAndApply, initStorageListener } from './storage.js';
 import { startPicker, stopPicker } from './picker.js';
+import { startSimplePicker, stopSimplePicker } from './simple-picker.js';
 import { startRevertPicker, stopRevertPicker } from './revert.js';
 
 export function init(styleEl) {
@@ -12,10 +13,12 @@ export function init(styleEl) {
 
 function initMessageBus() {
     chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-        if (msg.type === 'START_PICKER')        { startPicker();       sendResponse({ ok: true }); return; }
-        if (msg.type === 'STOP_PICKER')         { stopPicker();        sendResponse({ ok: true }); return; }
-        if (msg.type === 'START_REVERT_PICKER') { startRevertPicker(); sendResponse({ ok: true }); return; }
-        if (msg.type === 'STOP_REVERT_PICKER')  { stopRevertPicker();  sendResponse({ ok: true }); return; }
+        if (msg.type === 'START_PICKER')         { startPicker();        sendResponse({ ok: true }); return; }
+        if (msg.type === 'STOP_PICKER')          { stopPicker();         sendResponse({ ok: true }); return; }
+        if (msg.type === 'START_SIMPLE_PICKER')  { startSimplePicker();  sendResponse({ ok: true }); return; }
+        if (msg.type === 'STOP_SIMPLE_PICKER')   { stopSimplePicker();   sendResponse({ ok: true }); return; }
+        if (msg.type === 'START_REVERT_PICKER')  { startRevertPicker();  sendResponse({ ok: true }); return; }
+        if (msg.type === 'STOP_REVERT_PICKER')   { stopRevertPicker();   sendResponse({ ok: true }); return; }
 
         if (msg.type === 'SET_ENABLED') {
             state.siteEnabled = msg.enabled;

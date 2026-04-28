@@ -1,8 +1,9 @@
 let currentTab  = null;
 let currentHost = '';
-let pickerActive  = false;
-let revertActive  = false;
-let siteEnabled   = true;
+let pickerActive       = false;
+let simplePickerActive = false;
+let revertActive       = false;
+let siteEnabled        = true;
 
 async function getActiveTab() {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -134,6 +135,22 @@ document.getElementById('picker-btn').addEventListener('click', async () => {
     window.close();
 });
 
+// simple picker button
+document.getElementById('simple-picker-btn').addEventListener('click', async () => {
+    if (simplePickerActive) {
+        simplePickerActive = false;
+        document.getElementById('simple-picker-btn').classList.remove('active');
+        document.getElementById('simple-picker-label').textContent = 'Simple pick';
+        await sendToContent({ type: 'STOP_SIMPLE_PICKER' });
+    } else {
+        simplePickerActive = true;
+        document.getElementById('simple-picker-btn').classList.add('active');
+        document.getElementById('simple-picker-label').textContent = 'Click element on page… (Esc to cancel)';
+        await sendToContent({ type: 'START_SIMPLE_PICKER' });
+    }
+    window.close();
+});
+
 // revert picker button
 document.getElementById('revert-btn').addEventListener('click', async () => {
     if (revertActive) {
@@ -221,12 +238,16 @@ $importFile.addEventListener('change', async () => {
 
 // listen for updates from content script
 chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.type === 'RULES_UPDATED' || msg.type === 'PICKER_STOPPED' || msg.type === 'REVERT_PICKER_STOPPED') {
+    if (msg.type === 'RULES_UPDATED' || msg.type === 'PICKER_STOPPED' ||
+        msg.type === 'SIMPLE_PICKER_STOPPED' || msg.type === 'REVERT_PICKER_STOPPED') {
         loadRules();
-        pickerActive  = false;
-        revertActive  = false;
+        pickerActive       = false;
+        simplePickerActive = false;
+        revertActive       = false;
         document.getElementById('picker-btn').classList.remove('active');
-        document.getElementById('picker-label').textContent = 'Pick element to darken';
+        document.getElementById('picker-label').textContent = 'Smart pick';
+        document.getElementById('simple-picker-btn').classList.remove('active');
+        document.getElementById('simple-picker-label').textContent = 'Simple pick';
         document.getElementById('revert-btn').classList.remove('active');
         document.getElementById('revert-label').textContent = 'Revert element to original';
     }

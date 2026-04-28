@@ -1,27 +1,31 @@
 import { HOST, state } from './state.js';
 import { applyRules } from './storage.js';
-import { getSelector } from '../shared/selectors.js';
 import { darkVars, buildCSS } from '../shared/css.js';
-import { consolidate } from '../shared/consolidate.js';
 import {
     ensureOverlayDOM, moveHighlight, hideOverlay,
     resetOverlayColor, setPickerCursor,
 } from './overlay.js';
 
+function getSimpleSelector(el) {
+    if (el.id) return '#' + CSS.escape(el.id);
+    const tag     = el.tagName.toLowerCase();
+    const classes = [...el.classList].map(c => '.' + CSS.escape(c)).join('');
+    return tag + classes || tag;
+}
+
 let previewStyleEl = null;
 
-export function applyPreview(el) {
-    if (!el) { clearPreview(); return; }
+function applyPreview(el) {
     if (!previewStyleEl) {
         previewStyleEl = document.createElement('style');
-        previewStyleEl.id = '__darkzooka_preview';
+        previewStyleEl.id = '__darkzooka_simple_preview';
         document.documentElement.appendChild(previewStyleEl);
     }
-    const sel = getSelector(el);
+    const sel = getSimpleSelector(el);
     previewStyleEl.textContent = `:root{${darkVars(state.darkness)}}\n` + buildCSS([sel]);
 }
 
-export function clearPreview() {
+function clearPreview() {
     if (previewStyleEl) previewStyleEl.textContent = '';
 }
 
@@ -31,7 +35,7 @@ function onMouseMove(e) {
     state.hoveredEl    = el;
     state.pickerTarget = el;
     resetOverlayColor();
-    moveHighlight(el, 'Tab ↑ &nbsp;] ↓');
+    moveHighlight(el);
     applyPreview(el);
 }
 
@@ -39,18 +43,16 @@ function onPointerDown(e) {
     e.preventDefault();
     e.stopPropagation();
     const pt = document.elementFromPoint(e.clientX, e.clientY);
-    const el = (pt && !pt.id?.startsWith('__darkzooka')) ? pt : (state.pickerTarget || state.hoveredEl);
+    const el = (pt && !pt.id?.startsWith('__darkzooka')) ? pt : state.hoveredEl;
     if (!el || el.id?.startsWith('__darkzooka')) return;
 
-    const sel = getSelector(el);
+    const sel = getSimpleSelector(el);
     chrome.storage.local.get(['rules'], (data) => {
         const rules     = data.rules || {};
-        const siteRules = rules[HOST] || [];
-        siteRules.push(sel);
-        const merged = consolidate(siteRules);
-        rules[HOST]  = merged;
+        const siteRules = [...new Set([...(rules[HOST] || []), sel])];
+        rules[HOST] = siteRules;
         chrome.storage.local.set({ rules }, () => {
-            applyRules(merged);
+            applyRules(siteRules);
             chrome.runtime.sendMessage({ type: 'RULES_UPDATED' }).catch(() => {});
         });
     });
@@ -59,31 +61,13 @@ function onPointerDown(e) {
 function onClick(e) { e.preventDefault(); e.stopPropagation(); }
 
 function onKeyDown(e) {
-    if (e.key === 'Escape') { stopPicker(); return; }
-    if (e.key === 'Tab' || e.key === '[') {
-        e.preventDefault();
-        const parent = state.pickerTarget?.parentElement;
-        if (parent && parent !== document.documentElement) {
-            state.pickerTarget = parent;
-            moveHighlight(state.pickerTarget);
-            applyPreview(state.pickerTarget);
-        }
-        return;
-    }
-    if (e.key === ']') {
-        e.preventDefault();
-        if (state.pickerTarget && state.hoveredEl && state.pickerTarget !== state.hoveredEl) {
-            let n = state.hoveredEl;
-            while (n && n.parentElement !== state.pickerTarget) n = n.parentElement;
-            if (n) { state.pickerTarget = n; moveHighlight(n); applyPreview(n); }
-        }
-    }
+    if (e.key === 'Escape') stopSimplePicker();
 }
 
-export function startPicker() {
+export function startSimplePicker() {
     ensureOverlayDOM();
-    state.pickerActive  = true;
-    state.pickerTarget  = null;
+    state.simplePickerActive = true;
+    state.pickerTarget       = null;
     document.addEventListener('mousemove',   onMouseMove,   true);
     document.addEventListener('pointerdown', onPointerDown, true);
     document.addEventListener('click',       onClick,       true);
@@ -91,8 +75,8 @@ export function startPicker() {
     setPickerCursor(true);
 }
 
-export function stopPicker() {
-    state.pickerActive = false;
+export function stopSimplePicker() {
+    state.simplePickerActive = false;
     document.removeEventListener('mousemove',   onMouseMove,   true);
     document.removeEventListener('pointerdown', onPointerDown, true);
     document.removeEventListener('click',       onClick,       true);
@@ -100,5 +84,5 @@ export function stopPicker() {
     setPickerCursor(false);
     hideOverlay();
     clearPreview();
-    chrome.runtime.sendMessage({ type: 'PICKER_STOPPED' }).catch(() => {});
+    chrome.runtime.sendMessage({ type: 'SIMPLE_PICKER_STOPPED' }).catch(() => {});
 }

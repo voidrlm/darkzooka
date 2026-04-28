@@ -32,7 +32,7 @@ export function ensureOverlayDOM() {
     document.documentElement.appendChild(pickerLabel);
 }
 
-export function moveHighlight(el) {
+export function moveHighlight(el, hint = '') {
     const r = el.getBoundingClientRect();
     Object.assign(highlight.style, {
         display: 'block',
@@ -40,8 +40,8 @@ export function moveHighlight(el) {
         width: r.width + 'px', height: r.height + 'px',
     });
     const sel = getSelector(el);
-    pickerLabel.innerHTML =
-        `<span style="opacity:.6;font-size:10px;margin-right:6px">Tab ↑ &nbsp;] ↓</span>${sel.replace(/</g, '&lt;')}`;
+    pickerLabel.innerHTML = (hint ? `<span style="opacity:.6;font-size:10px;margin-right:6px">${hint}</span>` : '')
+        + sel.replace(/</g, '&lt;');
     pickerLabel.style.display = 'block';
     const labelTop = r.top > 24 ? r.top - 24 : r.bottom + 4;
     pickerLabel.style.top  = labelTop + 'px';

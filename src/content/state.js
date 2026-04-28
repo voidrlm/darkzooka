@@ -11,8 +11,11 @@ export const state = {
     hoveredEl:          null,
     pickerTarget:       null,
 
-    // Dark picker
-    pickerActive:       false,
+    // Dark picker (smart)
+    pickerActive:        false,
+
+    // Simple picker
+    simplePickerActive:  false,
 
     // Revert picker
     revertPickerActive:  false,

@@ -41,7 +41,7 @@ function onMouseMove(e) {
     if (el.id?.startsWith('__darkzooka')) return;
     state.hoveredEl    = el;
     state.pickerTarget = el;
-    moveHighlight(el);
+    moveHighlight(el, 'Tab ↑ &nbsp;] ↓');
     applyRevertPreview(el);
 }
 
