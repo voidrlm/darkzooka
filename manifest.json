@@ -17,7 +17,8 @@
         }
     },
     "background": {
-        "service_worker": "background.js"
+        "service_worker": "background.js",
+        "type": "module"
     },
     "permissions": [
         "activeTab",
@@ -28,9 +29,10 @@
     "host_permissions": ["<all_urls>"],
     "content_scripts": [
         {
-            "js": ["content.js"],
+            "js": ["src/content/index.js"],
             "matches": ["http://*/*", "https://*/*"],
-            "run_at": "document_start"
+            "run_at": "document_start",
+            "type": "module"
         }
     ]
 }
