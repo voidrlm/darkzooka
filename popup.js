@@ -1,6 +1,7 @@
 let currentTab = null;
 let currentHost = '';
 let pickerActive = false;
+let revertActive = false;
 let siteEnabled = true;
 
 async function getActiveTab() {
@@ -209,13 +210,33 @@ $importFile.addEventListener('change', async () => {
     await loadRules();
 });
 
+// revert picker button
+document.getElementById('revert-btn').addEventListener('click', async () => {
+    if (revertActive) {
+        revertActive = false;
+        document.getElementById('revert-btn').classList.remove('active');
+        document.getElementById('revert-label').textContent = 'Revert element to original';
+        await sendToContent({ type: 'STOP_REVERT_PICKER' });
+        window.close();
+    } else {
+        revertActive = true;
+        document.getElementById('revert-btn').classList.add('active');
+        document.getElementById('revert-label').textContent = 'Click element to revert… (Esc to cancel)';
+        await sendToContent({ type: 'START_REVERT_PICKER' });
+        window.close();
+    }
+});
+
 // listen for updates from content script
 chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.type === 'RULES_UPDATED' || msg.type === 'PICKER_STOPPED') {
+    if (msg.type === 'RULES_UPDATED' || msg.type === 'PICKER_STOPPED' || msg.type === 'REVERT_PICKER_STOPPED') {
         loadRules();
         pickerActive = false;
+        revertActive = false;
         document.getElementById('picker-btn').classList.remove('active');
         document.getElementById('picker-label').textContent = 'Pick element to darken';
+        document.getElementById('revert-btn').classList.remove('active');
+        document.getElementById('revert-label').textContent = 'Revert element to original';
     }
 });
 

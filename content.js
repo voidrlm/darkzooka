@@ -3,11 +3,12 @@
     window.__darkzookaLoaded = true;
 
     const HOST = location.hostname;
-    let pickerActive   = false;
-    let hoveredEl      = null;
-    let appliedRules   = [];
-    let siteEnabled    = true;
-    let darkness       = 100;   // 10–100
+    let pickerActive        = false;
+    let revertPickerActive  = false;
+    let hoveredEl           = null;
+    let appliedRules        = [];
+    let siteEnabled         = true;
+    let darkness            = 100;   // 10–100
 
     // ── Style tag injected synchronously — no flash ───────────────────────
     const styleEl = document.createElement('style');
@@ -276,6 +277,7 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
     // ── Picker dark preview ───────────────────────────────────────────────
     let previewStyleEl = null;
     let pickerCursorStyleEl = null;
+    let revertPreviewActive = false;
 
     function applyPreview(el) {
         if (!el) { clearPreview(); return; }
@@ -301,6 +303,48 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
         pickerCursorStyleEl.textContent = active
             ? `html, html * { cursor: crosshair !important; }`
             : '';
+    }
+
+    // ── Revert preview ───────────────────────────────────────────────────
+
+    function findMatchingRules(el) {
+        return appliedRules.filter(sel => {
+            try { return !!el.closest(sel); } catch { return false; }
+        });
+    }
+
+    function applyRevertPreview(el) {
+        if (!el) { clearRevertPreview(); return; }
+        const matching = findMatchingRules(el);
+        revertPreviewActive = true;
+        const remaining = appliedRules.filter(s => !matching.includes(s));
+        styleEl.textContent = (siteEnabled && remaining.length)
+            ? `:root{${darkVars(darkness)}}\n` + buildCSS(remaining)
+            : '';
+        // Colour highlight red or grey based on whether a rule was found
+        if (highlight) {
+            const hasRule = matching.length > 0;
+            const col = hasRule ? '#f85149' : '#484f58';
+            const glow = hasRule ? 'rgba(248,81,73,.3)' : 'rgba(72,79,88,.3)';
+            highlight.style.borderColor = col;
+            highlight.style.background = hasRule ? 'rgba(248,81,73,.06)' : 'rgba(72,79,88,.06)';
+            highlight.style.boxShadow = `0 0 0 1px ${glow},inset 0 0 0 1px ${glow}`;
+            if (pickerLabel) pickerLabel.style.background = col;
+        }
+    }
+
+    function clearRevertPreview() {
+        if (!revertPreviewActive) return;
+        revertPreviewActive = false;
+        styleEl.textContent = (siteEnabled && appliedRules.length)
+            ? `:root{${darkVars(darkness)}}\n` + buildCSS(appliedRules)
+            : '';
+        if (highlight) {
+            highlight.style.borderColor = '#7c3aed';
+            highlight.style.background = 'rgba(124,58,237,.08)';
+            highlight.style.boxShadow = '0 0 0 1px rgba(124,58,237,.3),inset 0 0 0 1px rgba(124,58,237,.3)';
+            if (pickerLabel) pickerLabel.style.background = '#7c3aed';
+        }
     }
 
     // ── Rule consolidation ────────────────────────────────────────────────
@@ -462,10 +506,99 @@ ${s} img{filter:brightness(.9)!important}`).join('\n');
         chrome.runtime.sendMessage({ type: 'PICKER_STOPPED' }).catch(() => {});
     }
 
+    // ── Revert picker event handlers ──────────────────────────────────────
+    function onRevertMouseMove(e) {
+        const el = e.target;
+        if (el === highlight || el === pickerLabel || el.id?.startsWith('__darkzooka')) return;
+        hoveredEl = el;
+        pickerTarget = el;
+        moveHighlight(pickerTarget);
+        applyRevertPreview(pickerTarget);
+    }
+
+    function onRevertPointerDown(e) {
+        if (!revertPickerActive) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        const pointTarget = document.elementFromPoint(e.clientX, e.clientY);
+        const el = (pointTarget && !pointTarget.id?.startsWith('__darkzooka'))
+            ? pointTarget
+            : (pickerTarget || hoveredEl);
+        if (!el || el.id?.startsWith('__darkzooka')) return;
+
+        const matching = findMatchingRules(el);
+        if (!matching.length) return;
+
+        chrome.storage.local.get(['rules'], (data) => {
+            const rules = data.rules || {};
+            rules[HOST] = (rules[HOST] || []).filter(s => !matching.includes(s));
+            chrome.storage.local.set({ rules }, () => {
+                revertPreviewActive = false;
+                applyRules(rules[HOST]);
+                chrome.runtime.sendMessage({ type: 'RULES_UPDATED' }).catch(() => {});
+            });
+        });
+    }
+
+    function onRevertClick(e) {
+        if (!revertPickerActive) return;
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    function onRevertKeyDown(e) {
+        if (!revertPickerActive) return;
+        if (e.key === 'Escape') { stopRevertPicker(); return; }
+        if (e.key === 'Tab' || e.key === '[') {
+            e.preventDefault();
+            const parent = pickerTarget?.parentElement;
+            if (parent && parent !== document.documentElement) {
+                pickerTarget = parent;
+                moveHighlight(pickerTarget);
+                applyRevertPreview(pickerTarget);
+            }
+            return;
+        }
+        if (e.key === ']') {
+            e.preventDefault();
+            if (pickerTarget && hoveredEl && pickerTarget !== hoveredEl) {
+                let n = hoveredEl;
+                while (n && n.parentElement !== pickerTarget) n = n.parentElement;
+                if (n) { pickerTarget = n; moveHighlight(pickerTarget); applyRevertPreview(pickerTarget); }
+            }
+        }
+    }
+
+    function startRevertPicker() {
+        ensurePickerDOM();
+        revertPickerActive = true;
+        pickerTarget = null;
+        document.addEventListener('mousemove', onRevertMouseMove, true);
+        document.addEventListener('pointerdown', onRevertPointerDown, true);
+        document.addEventListener('click', onRevertClick, true);
+        document.addEventListener('keydown', onRevertKeyDown, true);
+        setPickerCursor(true);
+    }
+
+    function stopRevertPicker() {
+        revertPickerActive = false;
+        document.removeEventListener('mousemove', onRevertMouseMove, true);
+        document.removeEventListener('pointerdown', onRevertPointerDown, true);
+        document.removeEventListener('click', onRevertClick, true);
+        document.removeEventListener('keydown', onRevertKeyDown, true);
+        setPickerCursor(false);
+        hideHighlight();
+        clearRevertPreview();
+        chrome.runtime.sendMessage({ type: 'REVERT_PICKER_STOPPED' }).catch(() => {});
+    }
+
     // ── Message bus from popup ────────────────────────────────────────────
     chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-        if (msg.type === 'START_PICKER') { startPicker(); sendResponse({ ok: true }); }
-        if (msg.type === 'STOP_PICKER')  { stopPicker();  sendResponse({ ok: true }); }
+        if (msg.type === 'START_PICKER')        { startPicker();       sendResponse({ ok: true }); }
+        if (msg.type === 'STOP_PICKER')         { stopPicker();        sendResponse({ ok: true }); }
+        if (msg.type === 'START_REVERT_PICKER') { startRevertPicker(); sendResponse({ ok: true }); }
+        if (msg.type === 'STOP_REVERT_PICKER')  { stopRevertPicker();  sendResponse({ ok: true }); }
 
         if (msg.type === 'SET_ENABLED') {
             siteEnabled = msg.enabled;
