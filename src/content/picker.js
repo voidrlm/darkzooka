@@ -52,7 +52,6 @@ function onPointerDown(e) {
         rules[HOST] = siteRules;
         chrome.storage.local.set({ rules, settings }, () => {
             applyRules(siteRules, state.exceptions);
-            stopPicker();
             chrome.runtime.sendMessage({ type: 'RULES_UPDATED' }).catch(() => {});
         });
     });
